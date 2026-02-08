@@ -14,6 +14,8 @@
 #include <list>
 #include <tuple> // Added for ORM mappings
 
+namespace sqldb {
+
 // ==========================================
 // 1. Type Definitions & Helpers
 // ==========================================
@@ -84,9 +86,21 @@ template<typename T>
 T getCol(const Row& row, const std::string& key) {
     auto it = row.find(key);
     if (it == row.end()) throw std::runtime_error("Column not found: " + key);
+    
     if (std::holds_alternative<T>(it->second)) {
         return std::get<T>(it->second);
     }
+    
+    // Coercions
+    if constexpr (std::is_same_v<T, int>) {
+        if (std::holds_alternative<long long>(it->second)) 
+            return static_cast<int>(std::get<long long>(it->second));
+    }
+    if constexpr (std::is_same_v<T, long long>) {
+        if (std::holds_alternative<int>(it->second)) 
+            return static_cast<long long>(std::get<int>(it->second));
+    }
+    
     throw std::runtime_error("Column type mismatch: " + key);
 }
 
@@ -789,6 +803,11 @@ public:
         return getTable(ORM<T>::table).query<T>(where, opts);
     }
 
+    template<typename T>
+    long long insert(const T& obj) {
+        return getTable(ORM<T>::table).insert(obj);
+    }
+
     // ==========================================
     // Transaction Support
     // ==========================================
@@ -862,3 +881,4 @@ public:
         return TransactionGuard(*this);
     }
 };
+} // namespace sqldb
