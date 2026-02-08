@@ -480,11 +480,18 @@ public:
         std::stringstream ss;
         ss << "CREATE TABLE IF NOT EXISTS " << quoteIdentifier(tableName) << " (";
         
+        std::vector<std::string> pkCols;
+        for (const auto& col : columns) {
+            if (col.isPrimaryKey) pkCols.push_back(col.name);
+        }
+
         for (size_t i = 0; i < columns.size(); ++i) {
             const auto& col = columns[i];
             ss << quoteIdentifier(col.name) << " " << typeToString(col.type);
 
-            if (col.isPrimaryKey) ss << " PRIMARY KEY";
+            // Only add PRIMARY KEY inline if it's the ONLY PK (required for AUTOINCREMENT to work)
+            if (col.isPrimaryKey && pkCols.size() == 1) ss << " PRIMARY KEY";
+
             if (col.isAutoIncrement) ss << " AUTOINCREMENT";
             if (col.isNotNull) ss << " NOT NULL";
 
@@ -498,6 +505,17 @@ public:
 
             if (i < columns.size() - 1) ss << ", ";
         }
+
+        // define composite primary key
+        if (pkCols.size() > 1) {
+            ss << ", PRIMARY KEY (";
+            for (size_t i = 0; i < pkCols.size(); ++i) {
+                ss << quoteIdentifier(pkCols[i]);
+                if (i < pkCols.size() - 1) ss << ", ";
+            }
+            ss << ")";
+        }
+
         ss << ");";
 
         std::string sql = ss.str();
